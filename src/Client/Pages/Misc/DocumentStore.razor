@@ -1,0 +1,131 @@
+@page "/document-store"
+@using Microsoft.Extensions.Localization
+@using CleanBlazor.Contracts.Documents
+@attribute [Authorize(Policy = Permissions.Documents.View)]
+@inject IStringLocalizer<DocumentStore> Localizer
+
+<style>
+    .mud-table-container {
+        overflow: auto;
+    }
+</style>
+
+<HeroTitle Title="@Localizer["Document Store"]" Description="@Localizer["Browse Available Documents."]"/>
+@if (!_loaded)
+        {
+            <MudProgressCircular Color="Color.Primary" Indeterminate="true"/>
+        }
+        else
+        {
+            <MudTable Elevation="25" ServerData="@(new Func<TableState, Task<TableData<GetAllDocumentsResponse>>>(ServerReload))" Hover="true" Dense="@_dense" Bordered="@_bordered" Striped="@_striped" @ref="_table">
+                <ToolBarContent>
+                    <div class="justify-center mud-text-align-center">
+                        @if (_canCreateDocuments)
+                        {
+                            <MudButton DisableElevation Variant="Variant.Filled" Color="Color.Primary" @onclick="@(() => InvokeModal())" StartIcon="@Icons.Material.Filled.Add" IconColor="Color.Surface">@Localizer["Create"]</MudButton>
+                            <MudButton DisableElevation Variant="Variant.Filled" OnClick="@(() => OnSearch(""))" StartIcon="@Icons.Material.Filled.Refresh" IconColor="Color.Surface" Color="Color.Secondary">@Localizer["Reload"]</MudButton>
+                        }
+                        else
+                        {
+                            <MudButton DisableElevation Variant="Variant.Filled" OnClick="@(() => OnSearch(""))" StartIcon="@Icons.Material.Filled.Refresh" IconColor="Color.Surface" Color="Color.Secondary">@Localizer["Reload"]</MudButton>
+                        }
+                    </div>
+                    <MudSpacer/>
+                    @if (_canSearchDocuments)
+                    {
+                        <MudTextField T="string" ValueChanged="@(OnSearch)" Placeholder="@Localizer["Search"]" Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+                    }
+                </ToolBarContent>
+                <HeaderContent>
+                    <MudTh>
+                        <MudTableSortLabel T="GetAllDocumentsResponse" SortLabel="documentIdField">@Localizer["Id"]</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="GetAllDocumentsResponse" SortLabel="documentTitleField">@Localizer["Title"]</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="GetAllDocumentsResponse" SortLabel="documentDescriptionField">@Localizer["Description"]</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="GetAllDocumentsResponse" SortLabel="documentDocumentTypeField">@Localizer["Document Type"]</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="GetAllDocumentsResponse" SortLabel="documentIsPublicField">@Localizer["Is Public"]</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="GetAllDocumentsResponse" SortLabel="documentDateCreatedField">@Localizer["Date Created"]</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh>
+                        <MudTableSortLabel T="GetAllDocumentsResponse" SortLabel="documentOwnerField">@Localizer["Owner"]</MudTableSortLabel>
+                    </MudTh>
+                    <MudTh Style="text-align:right">@Localizer["Actions"]</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Id">@context.Id</MudTd>
+                    <MudTd DataLabel="Title">
+                        <MudHighlighter Text="@context.Title" HighlightedText="@_searchString"/>
+                    </MudTd>
+                    <MudTd DataLabel="Description">
+                        <MudHighlighter Text="@context.Description" HighlightedText="@_searchString"/>
+                    </MudTd>
+                    <MudTd DataLabel="DocumentType">
+                        <MudHighlighter Text="@context.DocumentType" HighlightedText="@_searchString"/>
+                    </MudTd>
+                    <MudTd DataLabel="IsPublic">
+                        <MudCheckBox @bind-Checked="@context.IsPublic" ReadOnly="true" Color="Color.Secondary"/>
+                    </MudTd>
+                    <MudTd DataLabel="Date Created">@context.CreatedOn</MudTd>
+                    <MudTd DataLabel="Owner">
+                        @if (context.CreatedBy == CurrentUserId)
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       StartIcon="@Icons.Material.Filled.Face"
+                                       IconColor="Color.Secondary"
+                                       Size="Size.Small"
+                                       Color="Color.Surface"
+                                       Link="/account">
+                                @Localizer["you"]
+                            </MudButton>
+                        }
+                    </MudTd>
+                    <MudTd DataLabel="Actions" Style="text-align: right">
+                        @if (_canEditDocuments || _canDeleteDocuments)
+                        {
+                            <MudMenu Label="@Localizer["Actions"]" Variant="Variant.Filled" DisableElevation="true" EndIcon="@Icons.Material.Filled.KeyboardArrowDown" IconColor="Color.Secondary" Direction="Direction.Left" OffsetX="true">
+                                @if (context.CreatedBy == CurrentUserId)
+                                {
+                                    @if (_canEditDocuments)
+                                    {
+                                        <MudMenuItem @onclick="@(() => InvokeModal(context.Id))">@Localizer["Edit"]</MudMenuItem>
+                                    }
+                                    @if (_canDeleteDocuments)
+                                    {
+                                        <MudMenuItem @onclick="@(() => Delete(context.Id))">@Localizer["Delete"]</MudMenuItem>
+                                    }
+                                }
+                                <MudMenuItem Link="@context.Url" Disabled="@(string.IsNullOrWhiteSpace(context.Url))" Target="_blank">@Localizer["Download"]</MudMenuItem>
+                            </MudMenu>
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Filled"
+                                       DisableElevation="true"
+                                       StartIcon="@Icons.Material.Filled.DoNotTouch"
+                                       IconColor="Color.Secondary"
+                                       Size="Size.Small"
+                                       Color="Color.Surface">
+                                @Localizer["No Allowed Actions"]
+                            </MudButton>
+                        }
+                    </MudTd>
+                </RowTemplate>
+                <FooterContent>
+                    <MudSwitch @bind-Checked="@_dense" Color="Color.Secondary" Style="margin-left: 5px;">@Localizer["Dense"]</MudSwitch>
+                    <MudSwitch @bind-Checked="@_striped" Color="Color.Tertiary" Style="margin-left: 5px;">@Localizer["Striped"]</MudSwitch>
+                    <MudSwitch @bind-Checked="@_bordered" Color="Color.Warning" Style="margin-left: 5px;">@Localizer["Bordered"]</MudSwitch>
+                </FooterContent>
+                <PagerContent>
+                    <TablePager/>
+                </PagerContent>
+            </MudTable>
+                }
